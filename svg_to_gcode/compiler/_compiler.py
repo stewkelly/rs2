@@ -13,22 +13,19 @@ class Compiler:
     movement and lowered for drawing.
     """
 
-    def __init__(self, interface_class: typing.Type[Interface], movement_speed, drawing_speed, dwell_time=0, unit=None, custom_header=None, custom_footer=None):
+    def __init__(self, interface_class: typing.Type[Interface] , dwell_time=0, unit=None, custom_header=None, custom_footer=None):
         """
         Initialize the Compiler with the necessary settings for a drawing machine.
         
         :param interface_class: Specify which interface to use. Commonly a gcode interface for drawing machines.
-        :param movement_speed: Speed to move the pen when not drawing. Units are determined by the machine.
-        :param drawing_speed: Speed to move the pen when drawing.
         :param dwell_time: Time in ms for the pen to wait before starting to draw. Useful for precise positioning.
         :param unit: Measurement unit for the machine.
         :param custom_header: Commands executed before all generated commands. Defaults to lifting the pen.
         :param custom_footer: Commands executed after all generated commands. Defaults to lifting the pen.
         """
         self.interface = interface_class()
-        self.movement_speed = movement_speed
-        self.drawing_speed = drawing_speed
         self.dwell_time = dwell_time
+        self.offset_skipped = False
 
         if (unit is not None) and (unit not in UNITS):
             raise ValueError(f"Unknown unit {unit}. Please specify one of the following: {UNITS}")
@@ -36,13 +33,12 @@ class Compiler:
         self.unit = unit
 
         if custom_header is None:
-            custom_header = [self.interface.pen_up()]
+            custom_header = []
 
         if custom_footer is None:
             custom_footer = [self.interface.pen_up()]
 
-        self.header = [self.interface.set_relative_coordinates(),
-                       self.interface.set_movement_speed(self.movement_speed)] + custom_header
+        self.header = [self.interface.set_relative_coordinates()] + custom_header
         self.footer = custom_footer
         self.body = []
 
@@ -75,25 +71,29 @@ class Compiler:
 
     def append_line_chain(self, line_chain: LineSegmentChain):
         """
-        Draws a LineSegmentChain by moving the pen. The resulting code is appended to self.body.
+        Draws a LineSegmentChain by calling interface.linear_move() for each segment. The resulting code is appended to
+        self.body
         """
+
         if line_chain.chain_size() == 0:
             warnings.warn("Attempted to parse empty LineChain")
-            return
+            return []
 
-        # Lift pen before moving to the start of the line chain
-        code = [self.interface.pen_up(), 
-                self.interface.set_movement_speed(self.movement_speed)]
+        code = []
 
         start = line_chain.get(0).start
-        code.append(self.interface.linear_move(start.x, start.y))  # Move to start position
 
-        # Lower pen for drawing
-        code += [self.interface.pen_down(),
-                 self.interface.set_movement_speed(self.drawing_speed)]
+        # Don't dwell if the new start is at the current position
+        if self.interface.position is None or abs(self.interface.position - start) > TOLERANCES["operation"]:
+            code = [self.interface.pen_up()]
+            code.append(self.interface.relative_linear_move(start.x, start.y))
+            code.append(self.interface.pen_down())
 
+            if self.dwell_time > 0:
+                code = [self.interface.dwell(self.dwell_time)] + code
+                
         for line in line_chain:
-            code.append(self.interface.linear_move(line.end.x, line.end.y))  # Draw the line
+            code.append(self.interface.relative_linear_draw(line.end.x, line.end.y))
 
         self.body.extend(code)
 

@@ -13,51 +13,73 @@ class Gcode(Interface):
 
     def __init__(self):
         self.position = None
-        self._next_speed = None
-        self._current_speed = None
         self.pen_up_height = 5  # Adjust this value as needed for your machine
-        self.pen_down_height = 0  # Adjust this value as needed for your machine
+        self.pen_down_height = - self.pen_up_height  # Adjust this value as needed for your machine
 
         # Round outputs to the same number of significant figures as the operational tolerance.
         self.precision = abs(round(math.log(TOLERANCES["operation"], 10)))
 
-    def set_movement_speed(self, speed):
-        self._next_speed = speed
-        return ''
-
-    def linear_move(self, x=None, y=None, z=None):
-
-        if self._next_speed is None:
-            raise ValueError("Undefined movement speed. Call set_movement_speed before executing movement commands.")
-
+    def relative_linear_draw(self, x=None, y=None, z=None):
         # Don't do anything if linear move was called without passing a value.
         if x is None and y is None and z is None:
-            warnings.warn("linear_move command invoked without arguments.")
+            warnings.warn("relative_linear_move command invoked without arguments.")
             return ''
 
-        # Todo, investigate G0 command and replace movement speeds with G1 (normal speed) and G0 (fast move)
         command = "G1"
 
-        if self._current_speed != self._next_speed:
-            self._current_speed = self._next_speed
-            command += f" F{self._current_speed}"
+        # Calculate deltas and build command
+        if x is not None:
+            delta_x = x - self.position.x if self.position is not None else x
+            command += f" X{delta_x:.{self.precision}f}"
+        if y is not None:
+            delta_y = y - self.position.y if self.position is not None else y
+            command += f" Y{delta_y:.{self.precision}f}"
+        if z is not None:
+            delta_z = z - self.position.z if self.position is not None else z
+            command += f" Z{delta_z:.{self.precision}f}"
 
-        # Move if not 0 and not None
-        command += f" X{x:.{self.precision}f}" if x is not None else ''
-        command += f" Y{y:.{self.precision}f}" if y is not None else ''
-        command += f" Z{z:.{self.precision}f}" if z is not None else ''
-
-        if self.position is not None or (x is not None and y is not None):
-            if x is None:
-                x = self.position.x
-
-            if y is None:
-                y = self.position.y
-
-            self.position = Vector(x, y)
+        # Update current position
+        if self.position is not None:
+            new_x = self.position.x + delta_x if x is not None else self.position.x
+            new_y = self.position.y + delta_y if y is not None else self.position.y
+            
+        # Ensure we update position even if only one axis is provided
+        self.position = Vector(new_x, new_y) if self.position is not None else Vector(x or 0, y or 0)
 
         if verbose:
-            print(f"Move to {x}, {y}, {z}")
+            print(f"Relative move by {delta_x if x is not None else 0}, {delta_y if y is not None else 0}, {delta_z if z is not None else 0}")
+
+        return command + ';'
+    
+    def relative_linear_move(self, x=None, y=None, z=None):
+        # Don't do anything if linear move was called without passing a value.
+        if x is None and y is None and z is None:
+            warnings.warn("relative_linear_move command invoked without arguments.")
+            return ''
+
+        command = "G0"
+
+        # Calculate deltas and build command
+        if x is not None:
+            delta_x = x - self.position.x if self.position is not None else x
+            command += f" X{delta_x:.{self.precision}f}"
+        if y is not None:
+            delta_y = y - self.position.y if self.position is not None else y
+            command += f" Y{delta_y:.{self.precision}f}"
+        if z is not None:
+            delta_z = z - self.position.z if self.position is not None else z
+            command += f" Z{delta_z:.{self.precision}f}"
+
+        # Update current position
+        if self.position is not None:
+            new_x = self.position.x + delta_x if x is not None else self.position.x
+            new_y = self.position.y + delta_y if y is not None else self.position.y
+            
+        # Ensure we update position even if only one axis is provided
+        self.position = Vector(new_x, new_y) if self.position is not None else Vector(x or 0, y or 0)
+
+        if verbose:
+            print(f"Relative move by {delta_x if x is not None else 0}, {delta_y if y is not None else 0}, {delta_z if z is not None else 0}")
 
         return command + ';'
 

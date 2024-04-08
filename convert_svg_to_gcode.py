@@ -12,7 +12,7 @@ def convert_svg_to_gcode(svg_file_name, gcode_file_name):
     gcode_file_path = os.path.join(script_directory, gcode_file_name)
 
     # Instantiate a compiler, specifying the interface type, movement speed and drawing speed at which the tool moves while 
-    gcode_compiler = Compiler(interfaces.Gcode, 0, 100, 50)
+    gcode_compiler = Compiler(interfaces.Gcode)
 
     # Parse an svg file into geometric curves, and compile to gcode
     curves = parse_file(svg_file_path)
