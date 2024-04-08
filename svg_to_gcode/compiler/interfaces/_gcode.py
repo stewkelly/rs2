@@ -93,30 +93,3 @@ class Gcode(Interface):
 
     def home_axes(self):
         return "G28;"
-
-    def convert_absolute_to_relative_coordinates(commands):
-        relative_commands = []
-        last_x, last_y = 0, 0  # Starting point
-
-        for command in commands:
-            if command.startswith("G1") or command.startswith("G0"):
-                parts = command.split()
-                x_part = next((part for part in parts if part.startswith('X')), None)
-                y_part = next((part for part in parts if part.startswith('Y')), None)
-                x = float(x_part[1:]) if x_part else last_x
-                y = float(y_part[1:]) if y_part else last_y
-
-                # Calculate the relative move
-                dx = x - last_x if x_part else 0
-                dy = y - last_y if y_part else 0
-                last_x, last_y = x, y  # Update last positions
-
-                # Construct the new command with relative distances
-                new_command = command[0:3]  # Keep G0/G1
-                if x_part: new_command += " X{:.3f}".format(dx)
-                if y_part: new_command += " Y{:.3f}".format(dy)
-                relative_commands.append(new_command)
-            else:
-                relative_commands.append(command)  # Non-movement commands are unchanged
-
-        return relative_commands
