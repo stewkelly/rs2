@@ -111,3 +111,4 @@ class Compiler:
             line_chain.extend(approximation)
             self.append_line_chain(line_chain)
             
+            

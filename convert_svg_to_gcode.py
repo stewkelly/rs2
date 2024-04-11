@@ -1,5 +1,5 @@
 import os
-from svg_to_gcode.svg_parser import parse_file
+from svg_to_gcode.svg_parser import parse_file, polyline_to_path
 from svg_to_gcode.compiler import Compiler, interfaces
 from path_optimisation.path_optimisation import solve_tsp 
 
@@ -13,6 +13,8 @@ def convert_svg_to_gcode(svg_file_name, gcode_file_name):
 
     # Instantiate a compiler, specifying the interface type, movement speed and drawing speed at which the tool moves while 
     gcode_compiler = Compiler(interfaces.Gcode)
+    
+    polyline_to_path(svg_file_path)
 
     # Parse an svg file into geometric curves, and compile to gcode
     curves = parse_file(svg_file_path)
